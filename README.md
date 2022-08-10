@@ -1,2 +1,2 @@
 # mvg
-Multi view geometry
+Utilities related top Multi view geometry
