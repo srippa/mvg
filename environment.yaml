@@ -16,7 +16,6 @@ dependencies:
   - ipykernel
   - fastcore
   - nbdev
-  - ipyvolume
   - easydict
   - pip
   - pip:
@@ -26,3 +25,6 @@ dependencies:
 #     - torchvision==0.8.2+cu110 
     - opencv-python<4.6
     - pyransac3d
+    - git+git://github.com/widgetti/ipyvolume.git@v0.6.0-alpha.10
+
+    
