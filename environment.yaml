@@ -23,7 +23,7 @@ dependencies:
 #     - --find-links https://download.pytorch.org/whl/torch_stable.html
 #     - torch==1.7.1+cu110 
 #     - torchvision==0.8.2+cu110 
-    - ipyvolum==0.6.0a10
+    - ipyvolume==0.6.0a10
     - opencv-python<4.6
     - pyransac3d
 
