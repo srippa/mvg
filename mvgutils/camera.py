@@ -114,7 +114,7 @@ class CameraIntrinsicts:
 
     @staticmethod
     def from_opencv_model(K: np.ndarray, # 3x3 camera matrix
-                          distortions: Union[np.ndarray,list], # distortion array as produced by OpenCv
+                          distortions: np.ndarray, # distortion array as produced by OpenCv
                           width: int, # Camera width in pixels
                           height: int # Camera height in pixels
                          ) -> 'CameraIntrinsicts':
