@@ -66,7 +66,7 @@ class Plane3d:
         return Plane3d(best_eq), best_inliers
 
 
-# %% ../00_plane3d.ipynb 8
+# %% ../00_plane3d.ipynb 9
 @patch
 def get_span_vectors(self:Plane3d):
     "Return two vectors $v_1,v_2$ spanning the plane: independent vectors that are on the plane"
@@ -91,7 +91,7 @@ def get_span_vectors(self:Plane3d):
 
     return edict(origin=p0,v1=v1, v2=v2)
 
-# %% ../00_plane3d.ipynb 11
+# %% ../00_plane3d.ipynb 12
 @patch
 def transform_plane(self:Plane3d, transformation):
     p1 = [0, 1, self.z_val(0, 1)]
