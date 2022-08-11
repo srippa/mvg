@@ -1,0 +1,6 @@
+website:
+  sidebar:
+    contents:
+      - index.ipynb
+      - 00_plane3d.ipynb
+      - 01_plot3d.ipynb

@@ -1,0 +1,28 @@
+name: mvgutils
+channels:
+  - conda-forge
+  - pytorch
+  - fastai
+dependencies:
+  - python=3.10
+  - scipy
+  - numpy
+  - PyYAML<6.0 
+  - tqdm<4.64.0 
+  - matplotlib
+  - seaborn
+  - pandas
+  - Pillow
+  - ipykernel
+  - fastcore
+  - nbdev
+  - ipyvolume
+  - easydict
+  - pip
+  - pip:
+    # - torch==1.7.1+cu110  torchvision==0.8.2+cu110 -f https://download.pytorch.org/whl/torch_stable.html
+#     - --find-links https://download.pytorch.org/whl/torch_stable.html
+#     - torch==1.7.1+cu110 
+#     - torchvision==0.8.2+cu110 
+    - opencv-python==4.6.0.66
+    - pyransac3d
