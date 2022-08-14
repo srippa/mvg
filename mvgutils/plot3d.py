@@ -14,7 +14,7 @@ from .plane3d import Plane3d
 
 
 # %% ../01_plot3d.ipynb 6
-def init_3d_plot(xmin, ymin, xmax, ymax, zmin, zmax):
+def init_3d_plot(xmin, xmax, ymin, ymax, zmin, zmax):
     ' Initializes a ipyvolume 3d plot. Returns a fig '
     fig = ipv.pylab.figure(figsize=(15, 15), width=800)
     ipv.xlim(xmin, xmax)
@@ -47,7 +47,7 @@ def plot_planar_rect(plane3d: Plane3d,
     ymin = np.min(ys) - 0.2
     zmax = np.max(zs) + 0.2
     zmin = np.min(zs) - 0.2
-    init_3d_plot(xmin, ymin, xmax, ymax, zmin, zmax)
+    init_3d_plot(xmin, xmax, ymin, ymax, zmin, zmax)
 
     ipv.scatter(np.array([xs[0]]), np.array([ys[0]]), np.array([zs[0]]), color='red', marker='sphere')
     ipv.scatter(np.array([xs[1]]), np.array([ys[1]]), np.array([zs[1]]), color='blue', marker='sphere')
@@ -80,3 +80,5 @@ def plot_planar_rect(plane3d: Plane3d,
         ipv.style.axes_off()   # erase axes
 
     return ipv
+
+
