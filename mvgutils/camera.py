@@ -7,7 +7,7 @@ __all__ = ['SUPPORTED_CAMERA_MODELS', 'to_homogeneous', 'from_homogeneous', 'Int
 import numpy as np
 import cv2
 from easydict import EasyDict as edict
-from typing import Union, Tuple, List, Dict, NamedTuple
+from typing import Optional, Tuple, List, Dict, NamedTuple
 
 
 # %% ../03_camera.ipynb 5
@@ -141,13 +141,42 @@ class Intrinsicts:
         elif len(distortions) == 5:
             camera_model_name = 'OPENCV5'
             params += distortions
+        elif len(distortions) == 8:
+            camera_model_name = 'FULL_OPENCV'
+            params += distortions
         else:
             raise ValueError(f'Do not support opencv model with {len(distortions)} parameters')
 
         return Intrinsicts(camera_model_name,width, height, params)
 
     @staticmethod
-    def from_test_model():
+    def from_opencv_fisheye_model(K: np.ndarray, # 3x3 camera matrix
+                          distortions: np.ndarray, # distortion array for OpenCv fisheye model, should consist of 4 distrortion parameters
+                          width: int, # Camera width in pixels
+                          height: int # Camera height in pixels
+                         ) -> 'Intrinsicts':
+        'Contructing camera intrinsics model from data compatible with opencv fisheye model'
+        if not isinstance(distortions, list):
+            if len(distortions.shape) == 2:
+                distortions = distortions.squeeze()
+            distortions= distortions.tolist()
+     
+        fx = K[0,0]
+        cx = K[0,2]
+        fy = K[1,1]
+        cy = K[1,2]
+
+        params = [fx, fy, cx, cy]
+        if len(distortions) == 4:
+            camera_model_name = 'OPENCV'
+            params += distortions
+        else:
+            raise ValueError(f'Do not support fisheye-opencv model with {len(distortions)} parameters')
+
+        return Intrinsicts(camera_model_name,width, height, params)
+
+    @staticmethod
+    def from_test_model(as_full_opencv=False):
         'Contructing camera intrinsics model from opencv calibration tutorial'
         w, h = 640, 480 
 
@@ -159,6 +188,20 @@ class Intrinsicts:
             [-2.8122100441115472e-04], 
             [2.3839153080878486e-01]
             ]
+        )
+
+        if as_full_opencv:
+            distortions = np.array(
+                [
+                [-2.6637260909660682e-01], 
+                [-3.8588898922304653e-02], 
+                [1.7831947042852964e-03], 
+                [-2.8122100441115472e-04], 
+                [2.3839153080878486e-01],
+                [0.0],
+                [0.0],
+                [0.0]
+                ]
         )
 
         mtx = np.array(
@@ -254,8 +297,6 @@ class Intrinsicts:
         p = cp + [float(d) for d in self.distortions]
         return p
   
-
-
     def get_undistort_matrix(self, alpha=1.0):
         newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.K, self.distortions, (self.w,self.h), alpha, (self.w,self.h))
         return newcameramtx
@@ -419,28 +460,63 @@ class Intrinsicts:
 
     #---------------------------------------------------------------------------
     # project and unproject points functions:
-    #  camera2image : 3D point in camera ref coords --> 2D pixel coordinates 
-    #  image2camera : 2D pixel coordinates --> 3
     #---------------------------------------------------------------------------
-    # camera2image
-    def camera2image(
+    # camera2image_points
+    def camera2image_points(
         self, 
-        pc3d                # N points in camera coordinate system with shape (N,3)
-        ) -> Tuple[np.ndarray,np.ndarray]:    # N points in image coordinates with shape (N,2) and disparities with shape (N,1)
+        pc3d: np.ndarray                                   # 3D points in camera frame system with shape (N,3)
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray] :   # A 2D point in the camera plane with shape (N,2), disparities with shape (N,1) and boolean valid mask with shape (N,)
         'Project 3D points in the camera reference coordinate system into image coordinates'
 
         assert(pc3d.shape[-1] == 3)
 
-        p_camera_plane_undistorted, disparity, valid = self.project_perspective(pc3d)
-        p_camera_plane_distorted = self.distort(p_camera_plane_undistorted)    
-        p_image = self.camera_plane_distorted_to_image_plane(p_camera_plane_distorted)
-        return p_image, disparity
+        p_camera_plane_distorted, disparity, valid = self.project_and_distort_points(pc3d)
+        p_image = self.to_image_points(p_camera_plane_distorted)
+        return p_image, disparity, valid
 
-    def project_perspective(
+    def project_and_distort_points(
         self, 
-        pc3d: np.array     # a 3D point in camera frame, with shape (...,3) 
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray] :   # A 2D point in the camera plane with shape (..,2)
-        'A projective transformation cinverting a 3D point in canmera frame to a 2D point in the image plane of that frame'
+        pc3d: np.ndarray                                   # 3D points in camera frame system with shape (N,3)
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray] :   # A 2D point in the camera plane with shape (N,2), disparities with shape (N,1) and boolean valid mask with shape (N,)
+        'Project 3D points in the camera reference coordinate system into 2D distorted points in the camera frame'
+
+        # project to camera plane (undistorted). Not used when we use OpenCV functions ProjectPoints since they project and undistort 
+        # in a single function call
+        p_camera_plane_undistorted, disparity, valid = self.project_points(pc3d)
+
+        if self.camera_model_name in ['OPENCV', 'FULL_OPENCV']:
+            no_rot = np.array([[0.0], [0.0], [0.0]])
+            no_trans = np.array([[0.0], [0.0], [0.0]])
+            K = np.eye(3)
+            pimage_cv, _ =  cv2.projectPoints(
+                pc3d,                              # project to image
+                no_rot,
+                no_trans,
+                K,
+                self.distortions)
+            p_camera_plane_distorted = pimage_cv.squeeze(1)
+        elif self.camera_model_name ==  'OPENCV_FISHEYE':
+            no_rot = np.array([[0.0], [0.0], [0.0]])
+            no_trans = np.array([[0.0], [0.0], [0.0]])
+            K = np.eye(3)
+            p_camera_plane_distorted, _ =  cv2.fisheye.projectPoints(
+                pc3d,                              # project to image
+                no_rot,
+                no_trans,
+                K,
+                self.distortions)
+            p_camera_plane_distorted = pimage_cv.squeeze(1)
+        else:
+            p_camera_plane_distorted = self.distort_points(p_camera_plane_undistorted)    
+
+        return p_camera_plane_distorted, disparity, valid
+
+    def project_points(
+        self, 
+        pc3d: np.ndarray,                                  # 3D points in camera frame, with shape (N,3) 
+        projection_type: Optional[str] = 'perspective'     # Projection type
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray] :   # A 2D point in the camera plane with shape (N,2), disparities with shape (N,1) and boolean valid mask with shape (N,)
+        'Project 3D points in camera frame to 2D points in the camera plane'
         eps = 1e-3
 
         z = pc3d[..., -1]
@@ -450,18 +526,20 @@ class Intrinsicts:
         p2d = pc3d[..., :-1] * disparity
         return p2d, disparity, valid
 
-    def distort(
+    def distort_points(
         self, 
-        p_cam_undistorted: np.ndarray # Undistorted point in the camera plane with shape (...,2)
-        ) -> np.ndarray:
-        'Distort a point in the camera plane'
+        p_cam_undistorted: np.ndarray # 2D Undistorted point in the camera plane with shape (N,2)
+        ) -> np.ndarray:              # 2D distorted point in the camera plane with shape (N,2)
+        'Distort points in the camera plane'
         # see line 888 in https://github.com/colmap/colmap/blob/dev/src/base/camera_models.h
         camera_model_name = self.camera_model_name
         distortions = self.distortions
         if len(distortions) == 0:
             return  p_cam_distorted.copy()
 
-        if camera_model_name == 'OPENCV5':
+        if self.camera_model_name in ['OPENCV', 'FULL_OPENCV','OPENCV_FISHEYE']:
+            raise ValueError(f'Function distort_points can not be used for OpenCv models since the do projection and distortion in a single function call, thus require 3D points as input')
+        elif camera_model_name == 'OPENCV5':
             # See https://learnopencv.com/understanding-lens-distortion/
             k1 = distortions[0]
             k2 = distortions[1]
@@ -482,16 +560,17 @@ class Intrinsicts:
             xu = a*xd + 2.0*p1*xy + p2*(r2 + 2.0*x2)
             yu = a*yd + p1*(r2+2.0*y2) + 2.0*p2*xy
     
-        p_cam_distorted = np.stack([xu,yu], axis=-1)
+            p_cam_distorted = np.stack([xu,yu], axis=-1)
 
-        return p_cam_distorted
+            return p_cam_distorted
+        else:
+            raise ValueError(f'distort_points not impelmented for camera model [{self.camera_model_name}]')
 
-
-    def camera_plane_distorted_to_image_plane(
+    def to_image_points(
         self,
-        pc_distorted: np.ndarray  # The distorted point in the reference camera plane 2D shape (...,2)
-        ) -> np.ndarray:          # The undisgtorted point in the camerta pal;ne, shape (...,2)
-        'Transform an image given in the image plane of the camera reference frame into pixel coordinates in the image'
+        pc_distorted: np.ndarray  # 2D points in the camera plane with shape (N,2)
+        ) -> np.ndarray:          # 2D points in the image plane with shape (N,2)
+        'Transform points from the camera plane to the image plane, using the camera matrix K'
  
         pcd_h = to_homogeneous(pc_distorted)
         pix_T = pcd_h @ self.K_3.T
@@ -542,15 +621,15 @@ class Intrinsicts:
             step0 = np.maximum(eps, kRelStepSize * x0)
             step1 = np.maximum(eps, kRelStepSize * x1)
 
-            dx = self.distort(x)
+            dx = self.distort_points(x)
 
             kuku = np.array([x0 - step0, x1]).T
-            dx_0b = self.distort(kuku)
+            dx_0b = self.distort_points(kuku)
 
-            dx_0b = self.distort(np.array([x0 - step0, x1]).T)
-            dx_0f = self.distort(np.array([x0 + step0, x1]).T)
-            dx_1b = self.distort(np.array([x0        , x1 - step1]).T)
-            dx_1f = self.distort(np.array([x0        , x1 + step1]).T)
+            dx_0b = self.distort_points(np.array([x0 - step0, x1]).T)
+            dx_0f = self.distort_points(np.array([x0 + step0, x1]).T)
+            dx_1b = self.distort_points(np.array([x0        , x1 - step1]).T)
+            dx_1f = self.distort_points(np.array([x0        , x1 + step1]).T)
             J[:,0, 0] = 1 + (dx_0f[...,0] - dx_0b[...,0]) / (2 * step0)
             J[:,0, 1] = (dx_1f[...,0] - dx_1b[...,0]) / (2 * step1)
             J[:,1, 0] = (dx_0f[...,1] - dx_0b[...,1]) / (2 * step0)
@@ -565,16 +644,7 @@ class Intrinsicts:
  
             # step_x = jac_invs[:,...] @ (dx - p0)[...,:]
             # x -= step_x
-
-            # squaren_norm = step_x[0]*step_x[0] + step_x[1]*step_x[1]
-            # if squaren_norm < kMaxStepNorm:
-            #     print('stop at ',i)
-            #     break
-            
-            # if i == 4:
-            #     print('STOP at ',i)
-            #     break
-
+                                                    
         return  x   # undistorted
 
 
