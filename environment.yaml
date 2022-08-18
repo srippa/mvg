@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - pytorch
   - fastai
+  - pytorch
 dependencies:
   - python=3.9
   - scipy
@@ -18,6 +19,8 @@ dependencies:
   - nbdev
   - easydict
   - pip
+  - pytorch=1.12.1      
+  - torchvision=0.13.1   qua
   - pip:
     # - torch==1.7.1+cu110  torchvision==0.8.2+cu110 -f https://download.pytorch.org/whl/torch_stable.html
 #     - --find-links https://download.pytorch.org/whl/torch_stable.html
