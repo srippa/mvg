@@ -311,7 +311,7 @@ class Intrinsics:
 
 
     #----------------------------------------------------------
-    # operations
+    # scale/crop operations
     #----------------------------------------------------------    
     def scale(self, 
               scale_by: Tuple     #  Sacle factors as (scale_width, scale_height)
@@ -391,13 +391,14 @@ class Intrinsics:
     #----------------------------------------------------
     def get_undistort_camera(self, 
                              alpha: float    # A number between 0 (all pixels in the undistorted image are valid) and 1 (all source images are retained but there are some black pixels)
-                             ) -> 'Intrinsics':     # A PINHOLE camera model
+                             ) -> 'Intrinsics':     # A PINHOLE camera model that corresponds to the undistorted image
         'Update Intrinsicss for camera producing the undistorted image/points '
         # OpenCv function cvGetOptimalNewCameraMatrix
         #   See cvGetOptimalNewCameraMatrix in line 2714 of https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration.cpp
         #   See https://docs.opencv.org/3.3.0/dc/dbb/tutorial_py_calibration.html
         # COLMAP
         #   See https://github.com/colmap/colmap/blob/dev/src/base/undistortion.h
+        #   "UndistortCamera", line 752 in https://github.com/colmap/colmap/blob/dev/src/base/undistortion.cc
         #     alpha is called blank_pixels
 
         outer, inner = self._icv_get_rectangles()
@@ -433,14 +434,14 @@ class Intrinsics:
   
     def init_undistort_rectify_map(self, 
                                   alpha   # A number between 0 (all pixels in the undistorted image are valid) and 1 (all source images are retained but there are some black pixels)
-                                  ) -> edict: # dict with entries: "pinhole_camera", "mapx", "mapy"
+                                  ) -> edict: # dict with entries: "pinhole_camera", "mapx", "mapy" consisting of all infor needed to undistort an image
         'Return parameters needed for image undistortion plut the PINHOLE camera model of the undistorted image'
         pinhole_camera = self.get_undistort_camera(alpha)
 
         # See https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga7dfb72c9cf9780a347fbe3d1c47e5d5a
         # code - line 64 in https://github.com/egonSchiele/OpenCV/blob/master/modules/imgproc/src/undistort.cpp
-        mapx = np.zeros((pinhole_camera.h, pinhole_camera.w))
-        mapy = np.zeros((pinhole_camera.h, pinhole_camera.w))
+        mapx = np.zeros((pinhole_camera.h, pinhole_camera.w), dtype=np.float32)
+        mapy = np.zeros((pinhole_camera.h, pinhole_camera.w), dtype=np.float32)
 
         u = list(range(pinhole_camera.w))
         v = list(range(pinhole_camera.h))
@@ -454,11 +455,22 @@ class Intrinsics:
         p_distorted = self.distort_points(p_undistorted)         # Distort with the distortion  model of self
         pix = self.to_image_points(p_distorted)                  # transform to image points of self
 
-        mapx = pix[:,0].reshape((pinhole_camera.h,pinhole_camera.w))   # maping of x pixels so mapx[u,v] is the x index of that pixel in self
-        mapy = pix[:,1].reshape((pinhole_camera.h,pinhole_camera.w))   # maping of y pixels so mapx[u,v] is the y index of that pixel in self
+        mapx = pix[:,0].reshape((pinhole_camera.h,pinhole_camera.w)).astype(np.float32)   # maping of x pixels so mapx[u,v] is the x index of that pixel in self
+        mapy = pix[:,1].reshape((pinhole_camera.h,pinhole_camera.w)).astype(np.float32)   # maping of y pixels so mapx[u,v] is the y index of that pixel in self
 
         return edict(pinhole_camera=pinhole_camera, mapx=mapx, mapy=mapy)
 
+    @staticmethod
+    def undistort_image( 
+                        img: np.ndarray,          # Input image
+                        undistorted_info: edict   # The output from 'init_undistort_rectify_map'
+                        ) -> np.ndarray:          # undistorted image
+
+        # See https://opencv24-python-tutorials.readthedocs.io/en/stable/py_tutorials/py_calib3d/py_calibration/py_calibration.html
+        mapx, mapy = undistorted_info.mapx, undistorted_info.mapy
+        undistorted_img = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)    
+
+        return undistorted_img
 
     #---------------------------------------------------------------------------
     # project and unproject points functions:
