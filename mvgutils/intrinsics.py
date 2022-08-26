@@ -5,7 +5,7 @@ __all__ = ['SUPPORTED_CAMERA_MODELS', 'to_homogeneous', 'from_homogeneous', 'Int
 
 # %% ../03_intrinsics.ipynb 3
 from typing import Tuple
-import torch
+# import torch
 import numpy as np
 import cv2
 from easydict import EasyDict as edict
@@ -32,12 +32,12 @@ def to_homogeneous(points):
     Returns:
         A torch.Tensor or numpy.ndarray with size (..., N+1).
     """
-    if isinstance(points, torch.Tensor):
-        pad = points.new_ones(points.shape[:-1]+(1,))
-        return torch.cat([points, pad], dim=-1)
-    elif isinstance(points, np.ndarray):
+    if isinstance(points, np.ndarray):
         pad = np.ones((points.shape[:-1]+(1,)), dtype=points.dtype)
         return np.concatenate([points, pad], axis=-1)
+    # elif isinstance(points, torch.Tensor):
+    #     pad = points.new_ones(points.shape[:-1]+(1,))
+    #     return torch.cat([points, pad], dim=-1)
     else:
         raise ValueError
 
