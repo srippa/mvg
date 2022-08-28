@@ -636,7 +636,7 @@ class Intrinsics:
         return pd 
 
 
-    def undistort(self, 
+    def undistort_points(self, 
                   pc_distorted: np.ndarray  # Distorted points in the camera plane, shape (N,2)
                   ) -> np.ndarray:          # Undistorted points in the image plane
         'Undistort points in the image plane using the inverse of the distortion model for that camera model'
@@ -744,7 +744,7 @@ class Intrinsics:
                 k += 1
 
         p_camere_distorted = self.to_camera_points(points)
-        p_camera_undistorted = self.undistort(p_camere_distorted)
+        p_camera_undistorted = self.undistort_points(p_camere_distorted)
 
 
         k= 0

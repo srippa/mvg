@@ -5,7 +5,8 @@ MVG utils \> Set of utilities helping in setting and displaying multi
 view geometries
 
 This file will become your README and also the index of your
-documentation.
+documentation. Inspired by the [multiview geometry notebooks
+repo](https://github.com/maxcrous/multiview_notebooks)
 
 ## Install
 
